@@ -21,6 +21,7 @@ var (
 //Tailer contains watches tailed files and contains per-file output parameters
 type Tailer struct {
 	*tail.Tail
+	label     string
 	colorCode int
 	padding   string
 }
@@ -28,12 +29,12 @@ type Tailer struct {
 //NewTailers creates slice of Tailers from file names.
 //Colors of file names are cycled through the list.
 //maxWidth is a maximum widht of passed file names, for nice alignment
-func NewTailers(filenames []string) ([]*Tailer, error) {
-	maxLength := maximumNameLength(filenames)
-	ts := make([]*Tailer, len(filenames))
+func NewTailers(labeledFiles []*LabeledFile) ([]*Tailer, error) {
+	maxLength := maximumNameLength(labeledFiles)
+	ts := make([]*Tailer, len(labeledFiles))
 
-	for i, filename := range filenames {
-		t, err := newTailer(filename, getColorCode(i), maxLength)
+	for i, labeledFile := range labeledFiles {
+		t, err := newTailer(labeledFile, getColorCode(i), maxLength)
 		if err != nil {
 			return nil, err
 		}
@@ -44,21 +45,28 @@ func NewTailers(filenames []string) ([]*Tailer, error) {
 	return ts, nil
 }
 
-func newTailer(filename string, colorCode int, maxWidth int) (*Tailer, error) {
-	t, err := tail.TailFile(filename, tail.Config{
+func newTailer(labeledFile *LabeledFile, colorCode int, maxWidth int) (*Tailer, error) {
+	var location *tail.SeekInfo
+	if !labeledFile.Pipe {
+		location = seekInfoOnStart
+	}
+
+	t, err := tail.TailFile(labeledFile.FileName, tail.Config{
 		Follow:   true,
-		Location: seekInfoOnStart,
-		Logger:   tail.DiscardingLogger,
+		Location: location,
+		Logger:   tail.DefaultLogger,
+		Pipe:     labeledFile.Pipe,
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	dispNameLength := displayFilenameLength(filename)
+	dispNameLength := displayFilenameLength(labeledFile.name())
 
 	return &Tailer{
 		Tail:      t,
+		label:     labeledFile.Label,
 		colorCode: colorCode,
 		padding:   strings.Repeat(" ", maxWidth-dispNameLength),
 	}, nil
@@ -82,6 +90,9 @@ func (t Tailer) Do(output io.Writer) {
 }
 
 func (t Tailer) name() string {
+	if t.label != "" {
+		return t.label
+	}
 	return filepath.Base(t.Filename)
 }
 
@@ -89,10 +100,10 @@ func getColorCode(index int) int {
 	return ansiColorCodes[index%len(ansiColorCodes)]
 }
 
-func maximumNameLength(filenames []string) int {
+func maximumNameLength(labeledFiles []*LabeledFile) int {
 	max := 0
-	for _, name := range filenames {
-		if current := displayFilenameLength(name); current > max {
+	for _, labeledFile := range labeledFiles {
+		if current := displayFilenameLength(labeledFile.name()); current > max {
 			max = current
 		}
 	}

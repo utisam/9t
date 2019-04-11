@@ -17,7 +17,20 @@ type Config struct {
 	Colorize bool
 }
 
-func Runner(filenames []string, config Config) (*NineTail, error) {
+type LabeledFile struct {
+	Label    string
+	FileName string
+	Pipe     bool
+}
+
+func (lf *LabeledFile) name() string {
+	if lf.Label != "" {
+		return lf.Label
+	}
+	return lf.FileName
+}
+
+func Runner(filenames []*LabeledFile, config Config) (*NineTail, error) {
 	var output io.Writer
 	if config.Colorize {
 		output = colorable.NewColorableStdout()
