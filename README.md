@@ -13,6 +13,23 @@ Usage
 $ 9t file1 [file2 ...]
 ```
 
+This folk version has additional options to work with named pipes.
+
+```
+9t -l lable1:file1 -p named_pipe1 -l -p label2:named_pipe2 [file2 ...]
+```
+
+You can follow logs without creating files
+using [Bash Process Substitution](https://www.gnu.org/software/bash/manual/html_node/Process-Substitution.html).
+For example, to work with `ping`, `kubectl logs` and `kubectl get events`:
+
+```
+9t \
+    -p -l ping-local:<(ping 127.0.0.1) \
+    -p -l somepod:<(kubectl -f logs somepod) \
+    -p -l k8s-events:<(kubectl get events --watch)
+```
+
 ### Demo
 
 ![Demo](./images/9t.gif)
